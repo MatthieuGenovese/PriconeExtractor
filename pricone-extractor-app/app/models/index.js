@@ -22,5 +22,6 @@ db.sequelize = sequelize;
 db.item_data = require("./item_data.model.js")(sequelize, Sequelize);
 db.equipment_data = require("./equipment_data.model.js")(sequelize, Sequelize);
 db.unit_promotion = require("./unit_promotion.model.js")(sequelize, Sequelize);
+db.equipment_enhance_rate = require("./equipment_enhance_rate.model.js")(sequelize, Sequelize);
 
 module.exports = db;

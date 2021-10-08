@@ -1,6 +1,7 @@
 const db = require("../models");
 const Equipment_Data = db.equipment_data;
 const Unit_Promotion = db.unit_promotion;
+const Equipment_Enhance_Rate = db.equipment_enhance_rate;
 //"item_id","name","promotion_level","description","0","equipment_enhance_point","sell","craft_flg","{dataint:[hp,phyatk, magic_str,def,magic_def,physical_critical,magic_critical,wave_hp_recovery,wave_energy_recovery,dodge,physical_penetrate,magic_penetrate,life_steal,hp_recovery_rate,energy_recovery_rate,energy_reduce_rate,enable_donation,accuracy",
 //wave_hp_recovery,wave_energy_recovery,dodge,physical_penetrate,magic_penetrate,life_steal,hp_recovery_rate,energy_recovery_rate,energy_reduce_rate,enable_donation,accuracy",
 
@@ -19,9 +20,11 @@ const Unit_Promotion = db.unit_promotion;
 exports.convertEquipment = async (req, res) =>{
     let dataReceived = "";
     let cpt = 1;
+    var equipmentMap = new Map();
     const equipments = await Equipment_Data.findAll();
+    const equipmentsEnhanceRate = await Equipment_Enhance_Rate.findAll();
     equipments.forEach(element => {
-        dataReceived+= "\""+element.id + "|"
+        let result = "\""+element.id + "|"
         +"randomNamedeFDP"+cpt+"|"
         +element.promotion_level+"|"
         +"randomDescriptiondeFDP"+cpt+"|0|"
@@ -45,11 +48,40 @@ exports.convertEquipment = async (req, res) =>{
         +element.hp_recovery_rate*100+","
         +element.energy_recovery_rate*100+","
         +element.energy_reduce_rate*100+","
-        +element.enable_donation+","
-        +element.accuracy*100+"]}|{\\\"dataint\\\":[]}\""
-        +"<br>";
+        +element.accuracy*100+"]}|{\\\"dataint\\\":[";
+        if(equipmentMap.has(element.id)){
+            equipmentMap.set(element.id, equipmentMap.get(element.id)+result);
+        }
+        else{
+            equipmentMap.set(element.id, result);
+        }
         cpt = cpt + 1;
     });
+    equipmentsEnhanceRate.forEach(element =>{
+        let result = element.hp*100 +","
+        +element.atk*100+","
+        +element.magic_str*100+","
+        +element.def*100+","
+        +element.magic_def*100+","
+        +element.physical_critical*100+","
+        +element.magic_critical*100+","
+        +element.wave_hp_recovery*100+","
+        +element.wave_energy_recovery*100+","
+        +element.dodge*100+","
+        +element.physical_penetrate*100+","
+        +element.magic_penetrate*100+","
+        +element.life_steal*100+","
+        +element.hp_recovery_rate*100+","
+        +element.energy_recovery_rate*100+","
+        +element.energy_reduce_rate*100+","
+        +element.accuracy*100+"]}"
+        if(equipmentMap.has(element.equipment_id)){
+            equipmentMap.set(element.equipment_id, equipmentMap.get(element.equipment_id)+result);
+        }
+    });
+    for (var [key, value] of equipmentMap) {
+        dataReceived = dataReceived + value +"<br>";
+    }
     res.send(dataReceived);
 }
 
