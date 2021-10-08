@@ -6,6 +6,7 @@ module.exports = app => {
 
     
     // Retrieve all item_datas
-    router.get("/", converter.convert);
+    router.get("/", converter.convertEquipment);
+    router.get("/unit_promotion", converter.convertUnitPromotion);
     app.use('/api/item_datas', router);
   };
