@@ -8,5 +8,6 @@ module.exports = app => {
     // Retrieve all item_datas
     router.get("/", converter.convertEquipment);
     router.get("/unit_promotion", converter.convertUnitPromotion);
+    router.get("/skills",converter.convertSkills);
     app.use('/api/item_datas', router);
   };

@@ -3,6 +3,8 @@ const Equipment_Data = db.equipment_data;
 const Unit_Promotion = db.unit_promotion;
 const Equipment_Enhance_Rate = db.equipment_enhance_rate;
 const Unit_Promotion_Status = db.unit_promotion_status;
+const Skill_Data = db.skill_data;
+const Skill_Action = db.skill_action;
 
 exports.convertEquipment = async (req, res) =>{
     var fs = require("fs");
@@ -106,6 +108,8 @@ exports.convertEquipment = async (req, res) =>{
 }
 
 
+
+
 function asyncReplacePromotionStatus(unitPromotionStatusMap,unitPromotionStatusString, dataReceived){
     var promise = new Promise(function (resolve, errors){
         unitPromotionStatusMap.then(function(result){
@@ -160,6 +164,69 @@ function asyncWriteFileWithGear()
     return promise;
 }
 
+
+
+exports.convertSkills= async (req, res) =>{
+    var fs = require("fs");
+    var dataReceived = "";
+    var promise = asyncWriteFileWithSkill();
+    promise.then(function(result){
+        dataReceived = result;
+        var skillDataMap = getSkillDataMap();
+        var promise2 = asyncReplaceSkillData(dataReceived, skillDataMap);
+        promise2.then(function (result2){
+            dataReceived = result2;
+            console.log("result 2 " + result2 + "\n");
+            fs.writeFile("data/AllData.json", result2, (err) => {
+                if (err) console.log(err);
+                 console.log("Successfully Written to File.");
+            });  
+        });
+    });
+    res.send(dataReceived);
+}
+
+
+function asyncReplaceSkillData(dataReceived, skillDataMap){
+    var promise = new Promise(function (resolve, errors){
+        var totalSkillStr = "\"skillDataDic\": [\n";
+        skillDataMap.then(function(result2){
+            for (var [key, value] of result2) {
+                totalSkillStr = totalSkillStr + value + "\n"               
+            }
+            //console.log("total skill str : " + totalSkillStr + "\n");
+            totalSkillStr = totalSkillStr.slice(0,-2) + "\n  ],\n"
+            let stringStart = dataReceived.search("\"skillDataDic\"");
+            let stringEnd = dataReceived.search("\"skillActionDic\"");
+            //console.log("start " + stringStart + "\n");
+            //console.log("end " + stringEnd + "\n");
+            //console.log("datareceived sub " + dataReceived.substring(stringStart,stringEnd) + "\n");
+            dataReceived = dataReceived.replace(dataReceived.substring(stringStart,stringEnd), totalSkillStr);
+
+            resolve(dataReceived);              
+        });
+    });
+    return promise;
+}
+function asyncWriteFileWithSkill()
+{
+   var fs = require("fs");
+   var promise = new Promise(function (resolve, errors){
+       
+    fs.readFile("data/AllData.json", function( error, data ) {
+            if ( error ) {
+                errors( error );
+            } else {
+                //var intPosition = data.toString().search("\"skillDataDic\"");
+                //let subStr = data.toString().substring(intPosition, data.toString().length);
+                resolve( data.toString() );
+            }
+        });
+    });
+
+    return promise;
+}
+
 async function getUnitPromotionMap(){
     const unitPromotion = await Unit_Promotion.findAll();
     var unitPromotionMap = new Map();
@@ -179,6 +246,37 @@ async function getUnitPromotionMap(){
         }
     });
     return unitPromotionMap;    
+}
+
+async function getSkillDataMap(){
+    const skillData = await Skill_Data.findAll();
+    var skillDataMap = new Map();
+    cpt = 0;
+    skillData.forEach(element => {
+        let result = "\t\""
+        +element.skill_id + "@"
+        +"pongpong" +cpt+"@"
+        +element.skill_type + "@"
+        +element.skill_area_width + "@"
+        +element.skill_cast_time + "@["
+        +element.action_1 + ","
+        +element.action_2 + ","
+        +element.action_3 + ","
+        +element.action_4 + ","
+        +element.action_5 + "]@["
+        +element.depend_action_1 + ","
+        +element.depend_action_2 + ","
+        +element.depend_action_3 + ","
+        +element.depend_action_4 + ","
+        +element.depend_action_5 + ","
+        +element.depend_action_6 + ","
+        +element.depend_action_7 + "]@"
+        +"sample@"
+        +element.icon_type + "\",";
+        skillDataMap.set(element.skill_id, result);
+        cpt = cpt + 1;
+    });
+    return skillDataMap;
 }
 
 async function getUnitPromotionStatusMap(){
