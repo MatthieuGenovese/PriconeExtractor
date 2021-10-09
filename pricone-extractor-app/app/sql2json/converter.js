@@ -5,10 +5,10 @@ const Equipment_Enhance_Rate = db.equipment_enhance_rate;
 
 exports.convertEquipment = async (req, res) =>{
     var fs = require("fs");
-
     let dataReceived = "{\n  \"equipmentDic\": [\n";
     let cpt = 1;
     var equipmentMap = new Map();
+    var equipmentsEnhanceRateMap = new Map();
     const equipments = await Equipment_Data.findAll();
     const equipmentsEnhanceRate = await Equipment_Enhance_Rate.findAll();
     equipments.forEach(element => {
@@ -62,13 +62,24 @@ exports.convertEquipment = async (req, res) =>{
         +parseFloat(element.hp_recovery_rate*100).toFixed(0)+","
         +parseFloat(element.energy_recovery_rate*100).toFixed(0)+","
         +parseFloat(element.energy_reduce_rate*100).toFixed(0)+","
-        +parseFloat(element.accuracy*100).toFixed(0)+"]}"
+        +parseFloat(element.accuracy*100).toFixed(0)+"]}";
+        if(equipmentsEnhanceRateMap.has(element.equipment_id)){
+            equipmentsEnhanceRateMap.set(element.id, equipmentsEnhanceRateMap.get(element.id)+result);
+        }
+        else{
+            equipmentsEnhanceRateMap.set(element.id, result);
+        }
         if(equipmentMap.has(element.equipment_id)){
             equipmentMap.set(element.equipment_id, equipmentMap.get(element.equipment_id)+result);
         }
     });
     for (var [key, value] of equipmentMap) {
-        dataReceived = dataReceived + "  " + value +"\",\n";
+        if(equipmentsEnhanceRateMap.has(key)){
+            dataReceived = dataReceived + "  " + value +"\",\n";
+        }
+        else{
+            dataReceived = dataReceived + "  " + value +"0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}\",\n";
+        }
     }
     dataReceived = dataReceived.slice(0,-2) + "\n";
     dataReceived = dataReceived + "  ],\n";
@@ -77,7 +88,6 @@ exports.convertEquipment = async (req, res) =>{
         dataReceived = dataReceived + "  " + result;
         var unitPromotionMap = getUnitPromotionMap();
         var promise2 = asyncReplaceRank(dataReceived, unitPromotionMap);
-        
         promise2.then(function (result2){
             dataReceived = result2;
             fs.writeFile("data/AllData.json", result2, (err) => {
