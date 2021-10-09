@@ -2,10 +2,12 @@ const db = require("../models");
 const Equipment_Data = db.equipment_data;
 const Unit_Promotion = db.unit_promotion;
 const Equipment_Enhance_Rate = db.equipment_enhance_rate;
+const Unit_Promotion_Status = db.unit_promotion_status;
 
 exports.convertEquipment = async (req, res) =>{
     var fs = require("fs");
     let dataReceived = "{\n  \"equipmentDic\": [\n";
+    let unitPromotionStatusString = "";
     let cpt = 1;
     var equipmentMap = new Map();
     var equipmentsEnhanceRateMap = new Map();
@@ -64,10 +66,10 @@ exports.convertEquipment = async (req, res) =>{
         +parseFloat(element.energy_reduce_rate*100).toFixed(0)+","
         +parseFloat(element.accuracy*100).toFixed(0)+"]}";
         if(equipmentsEnhanceRateMap.has(element.equipment_id)){
-            equipmentsEnhanceRateMap.set(element.id, equipmentsEnhanceRateMap.get(element.id)+result);
+            equipmentsEnhanceRateMap.set(element.equipment_id, equipmentsEnhanceRateMap.get(element.equipment_id)+result);
         }
         else{
-            equipmentsEnhanceRateMap.set(element.id, result);
+            equipmentsEnhanceRateMap.set(element.equipment_id, result);
         }
         if(equipmentMap.has(element.equipment_id)){
             equipmentMap.set(element.equipment_id, equipmentMap.get(element.equipment_id)+result);
@@ -87,16 +89,37 @@ exports.convertEquipment = async (req, res) =>{
     promise.then(function(result){
         dataReceived = dataReceived + "  " + result;
         var unitPromotionMap = getUnitPromotionMap();
+        var unitPromotionStatusMap = getUnitPromotionStatusMap();
         var promise2 = asyncReplaceRank(dataReceived, unitPromotionMap);
         promise2.then(function (result2){
             dataReceived = result2;
-            fs.writeFile("data/AllData.json", result2, (err) => {
-                if (err) console.log(err);
-                console.log("Successfully Written to File.");
-            });           
+            var promise3 = asyncReplacePromotionStatus(unitPromotionStatusMap,unitPromotionStatusString, dataReceived);
+            promise3.then(function(result3){
+                fs.writeFile("data/AllData.json", result3, (err) => {
+                    if (err) console.log(err);
+                    console.log("Successfully Written to File.");
+                });
+            });       
         });
     });
     res.send(dataReceived);
+}
+
+
+function asyncReplacePromotionStatus(unitPromotionStatusMap,unitPromotionStatusString, dataReceived){
+    var promise = new Promise(function (resolve, errors){
+        unitPromotionStatusMap.then(function(result){
+            for (var [key, value] of result) {
+                var characterPositionLine = dataReceived.search(key+"~")-1;
+                var tmpSubstring = dataReceived.substring(characterPositionLine, dataReceived.length).split('\n')[0];
+                var tmpSubstringrank = tmpSubstring.substring(tmpSubstring.search("\\%\\[")+2, tmpSubstring.search("\\]~"+key));
+                dataReceived = dataReceived.replace(tmpSubstringrank, value.slice(0, -1));
+
+            };
+            resolve(dataReceived);
+        });
+    });
+    return promise;
 }
 
 function asyncReplaceRank(dataReceived, unitPromotionMap){
@@ -128,7 +151,6 @@ function asyncWriteFileWithGear()
                 errors( error );
             } else {
                 var intPosition = data.toString().search("\"unitRarityDic\"");
-                console.log("int position " + intPosition);       
                 let subStr = data.toString().substring(intPosition, data.toString().length);
                 resolve( subStr );
             }
@@ -157,6 +179,39 @@ async function getUnitPromotionMap(){
         }
     });
     return unitPromotionMap;    
+}
+
+async function getUnitPromotionStatusMap(){
+    const unitPromotionStatus = await Unit_Promotion_Status.findAll();
+    var unitPromotionStatusMap = new Map();
+    //\"{\\\"dataint\\\":[16710,2268,0,120,100,0,0,0,0,0,0,0,0,0,0,0,0]}\"
+    unitPromotionStatus.forEach(element => {
+        let result = "\\\"{\\\\\\\"dataint\\\\\\\":["
+        +parseFloat(element.hp*100).toFixed(0) +","
+        +parseFloat(element.atk*100).toFixed(0)+","
+        +parseFloat(element.magic_str*100).toFixed(0)+","
+        +parseFloat(element.def*100).toFixed(0)+","
+        +parseFloat(element.magic_def*100).toFixed(0)+","
+        +parseFloat(element.physical_critical*100).toFixed(0)+","
+        +parseFloat(element.magic_critical*100).toFixed(0)+","
+        +parseFloat(element.wave_hp_recovery*100).toFixed(0)+","
+        +parseFloat(element.wave_energy_recovery*100).toFixed(0)+","
+        +parseFloat(element.dodge*100).toFixed(0)+","
+        +parseFloat(element.physical_penetrate*100).toFixed(0)+","
+        +parseFloat(element.magic_penetrate*100).toFixed(0)+","
+        +parseFloat(element.life_steal*100).toFixed(0)+","
+        +parseFloat(element.hp_recovery_rate*100).toFixed(0)+","
+        +parseFloat(element.energy_recovery_rate*100).toFixed(0)+","
+        +parseFloat(element.energy_reduce_rate*100).toFixed(0)+","
+        +parseFloat(element.accuracy*100).toFixed(0)+"]}\\\",";
+        if(unitPromotionStatusMap.has(element.unit_id)){
+            unitPromotionStatusMap.set(element.unit_id, unitPromotionStatusMap.get(element.unit_id)+result);
+        }
+        else{
+            unitPromotionStatusMap.set(element.unit_id, result);
+        }
+    });
+    return unitPromotionStatusMap;
 }
 
 exports.convertUnitPromotion = async (req, res) =>{
