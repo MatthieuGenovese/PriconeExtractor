@@ -2,29 +2,17 @@ const db = require("../models");
 const Equipment_Data = db.equipment_data;
 const Unit_Promotion = db.unit_promotion;
 const Equipment_Enhance_Rate = db.equipment_enhance_rate;
-//"item_id","name","promotion_level","description","0","equipment_enhance_point","sell","craft_flg","{dataint:[hp,phyatk, magic_str,def,magic_def,physical_critical,magic_critical,wave_hp_recovery,wave_energy_recovery,dodge,physical_penetrate,magic_penetrate,life_steal,hp_recovery_rate,energy_recovery_rate,energy_reduce_rate,enable_donation,accuracy",
-//wave_hp_recovery,wave_energy_recovery,dodge,physical_penetrate,magic_penetrate,life_steal,hp_recovery_rate,energy_recovery_rate,energy_reduce_rate,enable_donation,accuracy",
 
-"105191|Reaper Axe|5|A.|1|400|24000|1|{\"dataint\":[0,12000,0,0,0,0,0,0,0,0,0,0,200,0,0,0,100]}|{\"dataint\":[0,2400,0,0,0,0,0,0,0,0,0,0,40,0,0,0,20]}"
-//[[101101,101101,101281,101431,101071,101581],
-//[102101,102071,102341,102431,101101,101581],
-//[103071,102101,102342,102432,102071,102581],
-//[103101,103071,103341,103431,102101,102582],
-//[103072,103101,103342,103432,103071,103581],
-//[104101,103072,103343,103432,103552,103582],
-/*[104102,104101,104341,103583,103072,103552],
-[104103,104102,104342,104101,104551,103553],
-[104104,104103,104343,104102,104552,104551],
-[105101,104104,104284,104103,104553,104552],
-[999999,105101,999999,104344,999999,104554]]*/
 exports.convertEquipment = async (req, res) =>{
-    let dataReceived = "";
+    var fs = require("fs");
+
+    let dataReceived = "{\n  \"equipmentDic\": [\n";
     let cpt = 1;
     var equipmentMap = new Map();
     const equipments = await Equipment_Data.findAll();
     const equipmentsEnhanceRate = await Equipment_Enhance_Rate.findAll();
     equipments.forEach(element => {
-        let result = "\""+element.id + "|"
+        let result = "\t\""+element.id + "|"
         +"randomNamedeFDP"+cpt+"|"
         +element.promotion_level+"|"
         +"randomDescriptiondeFDP"+cpt+"|0|"
@@ -80,9 +68,85 @@ exports.convertEquipment = async (req, res) =>{
         }
     });
     for (var [key, value] of equipmentMap) {
-        dataReceived = dataReceived + value +"<br>";
+        dataReceived = dataReceived + "  " + value +"\",\n";
     }
+    dataReceived = dataReceived.slice(0,-2) + "\n";
+    dataReceived = dataReceived + "  ],\n";
+    var promise = asyncWriteFileWithGear();
+    promise.then(function(result){
+        dataReceived = dataReceived + "  " + result;
+        var unitPromotionMap = getUnitPromotionMap();
+        var promise2 = asyncReplaceRank(dataReceived, unitPromotionMap);
+        
+        promise2.then(function (result2){
+            dataReceived = result2;
+            fs.writeFile("data/AllData.json", result2, (err) => {
+                if (err) console.log(err);
+                console.log("Successfully Written to File.");
+            });           
+        });
+    });
     res.send(dataReceived);
+}
+
+function asyncReplaceRank(dataReceived, unitPromotionMap){
+    var promise = new Promise(function (resolve, errors){
+        unitPromotionMap.then(function(result2){
+            for (var [key, value] of result2) {
+                var characterPositionLine = dataReceived.search(key+"~")-1;
+                var tmpSubstring = dataReceived.substring(characterPositionLine, dataReceived.length).split('\n')[0];
+                var tmpSubstringrank = tmpSubstring.substring(tmpSubstring.search("\\[\\["), tmpSubstring.search("\\]\\]")+2);
+                if(tmpSubstringrank.length >= 50){
+                    var newRankstring = "[" + value.slice(0, -1)+"]";
+                    dataReceived = dataReceived.replace(tmpSubstringrank, newRankstring);
+                }
+            }
+            resolve(dataReceived);
+                     
+        });
+    });
+    return promise;
+}
+
+function asyncWriteFileWithGear()
+{
+   var fs = require("fs");
+   var promise = new Promise(function (resolve, errors){
+       
+    fs.readFile("data/AllDataOld.json", function( error, data ) {
+            if ( error ) {
+                errors( error );
+            } else {
+                var intPosition = data.toString().search("\"unitRarityDic\"");
+                console.log("int position " + intPosition);       
+                let subStr = data.toString().substring(intPosition, data.toString().length);
+                resolve( subStr );
+            }
+        });
+    });
+
+    return promise;
+}
+
+async function getUnitPromotionMap(){
+    const unitPromotion = await Unit_Promotion.findAll();
+    var unitPromotionMap = new Map();
+    unitPromotion.forEach(element => {
+        let result ="["
+        +element.equip_slot_1+","
+        +element.equip_slot_2+","
+        +element.equip_slot_3+","
+        +element.equip_slot_4+","
+        +element.equip_slot_5+","
+        +element.equip_slot_6+"],"       
+        if(unitPromotionMap.has(element.unit_id)){
+            unitPromotionMap.set(element.unit_id, unitPromotionMap.get(element.unit_id)+result);
+        }
+        else{
+            unitPromotionMap.set(element.unit_id, result);
+        }
+    });
+    return unitPromotionMap;    
 }
 
 exports.convertUnitPromotion = async (req, res) =>{
@@ -97,7 +161,7 @@ exports.convertUnitPromotion = async (req, res) =>{
         +element.equip_slot_3+","
         +element.equip_slot_4+","
         +element.equip_slot_5+","
-        +element.equip_slot_6+"]],"       
+        +element.equip_slot_6+"],"       
         if(unitPromotionMap.has(element.unit_id)){
             unitPromotionMap.set(element.unit_id, unitPromotionMap.get(element.unit_id)+result);
         }
@@ -106,9 +170,9 @@ exports.convertUnitPromotion = async (req, res) =>{
         }
     });
     for (var [key, value] of unitPromotionMap) {
-        unitPromotionOutput = unitPromotionOutput + key + " " + value;
+        unitPromotionOutput = unitPromotionOutput + key + "[" + value;
         unitPromotionOutput = unitPromotionOutput.slice(0, -1);
-        unitPromotionOutput = unitPromotionOutput + "<br>";
+        unitPromotionOutput = unitPromotionOutput + "]<br>";
     }
     res.send(unitPromotionOutput);
 }
